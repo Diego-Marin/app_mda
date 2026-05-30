@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesa de Ayuda - Sistema Integrado</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #f0f4f9;
+            --bg-surface: #ffffff;
+            --text-primary: #1f1f1f;
+            --text-secondary: #5f6368;
+            --accent: #1a73e8;
+            --accent-light: #e8f0fe;
+            --border-color: #e0e2e6;
+            --status-open: #146c2e;
+            --status-open-bg: #e6f4ea;
+            --status-closed: #5f6368;
+            --status-closed-bg: #f1f3f4;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
+        body { background-color: var(--bg-main); color: var(--text-primary); min-height: 100vh; }
+
+        /* Vistas Principales */
+        .view-section { display: none; padding: 16px; }
+        .view-section.active { display: block; }
+
+        /* Pantallla de Selección de Rol (Primer Viewport) */
+        .login-container { max-width: 400px; margin: 80px auto 0 auto; text-align: center; padding: 24px; }
+        .login-logo { width: 12px; height: 32px; background: linear-gradient(180deg, #1a73e8 0%, #7baaf7 100%); border-radius: 4px; margin: 0 auto 16px auto; }
+        .login-title { font-size: 24px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.5px; }
+        .login-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; }
+        
+        .role-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; text-align: left; cursor: pointer; transition: all 0.2s ease; }
+        .role-card:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(26,115,232,0.08); }
+        .role-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .role-desc { font-size: 13px; color: var(--text-secondary); }
+
+        /* Panel de Control (Dashboard) */
+        .dashboard-container { max-width: 600px; margin: 0 auto; }
+        .main-header { background-color: var(--bg-surface); border-bottom: 1px solid var(--border-color); sticky; top: 0; z-index: 100; margin: -16px -16px 16px -16px; padding: 12px 16px; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto; }
+        .user-info { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+        
+        /* Controles de Filtrado y Búsqueda */
+        .filter-section { margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .search-box { width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); font-size: 14px; outline: none; }
+        .search-box:focus { border-color: var(--accent); }
+        .tabs-container { display: flex; gap: 8px; overflow-x: auto; }
+        
+        /* Botones y Elementos UI comunes */
+        .btn { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-align: center; }
+        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        
+        .tab-btn { background: var(--bg-surface); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+        .tab-btn.active { background-color: var(--text-primary); color: var(--bg-surface); border-color: var(--text-primary); }
+
+        /* Lista de Tickets */
+        .tickets-list { display: flex; flex-direction: column; gap: 12px; }
+        .ticket-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; }
+        .ticket-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .ticket-id { font-weight: 700; color: var(--text-secondary); font-size: 12px; font-family: monospace; }
+        .status-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+        .status-badge.abierto { background: var(--status-open-bg); color: var(--status-open); }
+        .status-badge.cerrado { background: var(--status-closed-bg); color: var(--status-closed); }
+        .ticket-inst { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .ticket-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+
+        /* Restricciones de Rol en UI (Dinámico) */
+        .admin-only { display: none; }
+        body[data-role="admin"] .admin-only { display: block; }
+
+        /* Modal / Panel de Cierre */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: flex-end; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: var(--bg-surface); width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 24px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .form-textarea { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; resize: none; height: 100px; font-size: 14px; margin-top: 8px; outline: none; }
+        .form-textarea:focus { border-color: var(--accent); }
+
+        @media (min-width: 768px) {
+            .view-section { padding: 24px; }
+            .dashboard-container { max-width: 750px; }
+            .header-content { max-width: 750px; }
+            .modal-overlay { align-items: center; }
+            .modal-content { border-radius: var(--radius-lg); }
+        }
+    </style>
+</head>
+<body>
+
+    <section id="view-login" class="view-section active">
+        <div class="login-container">
+            <div class="login-logo"></div>
+            <h1 class="login-title">Mesa de Ayuda</h1>
+            <p class="login-subtitle">Selecciona el perfil para iniciar sesión</p>
+            
+            <div class="role-card" onclick="iniciarSesion('admin')">
+                <div class="role-name">Administrador</div>
+                <div class="role-desc">Gestión global, asignación de casos y reportes estadísticos.</div>
+            </div>
+            
+            <div class="role-card" onclick="iniciarSesion('tecnico')">
+                <div class="role-name">Técnico de Soporte</div>
+                <div class="role-desc">Consulta de hoja de ruta asignada y cierre de servicios en campo.</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="view-dashboard" class="view-section">
+        <div class="dashboard-container">
+            
+            <header class="main-header">
+                <div class="header-content">
+                    <div class="user-info">
+                        <span style="width:8px; height:8px; background:#146c2e; border-radius:50%;"></span>
+                        <span id="txt-rol-activo">Perfil</span>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="cerrarSesion()">Salir</button>
+                </div>
+            </header>
+
+            <div class="admin-only" style="margin-bottom: 20px;">
+                <button class="btn btn-primary" style="width: auto;" onclick="alert('Funcionalidad exclusiva de Administrador: Crear Ticket')">+ Crear Nuevo Ticket</button>
+            </div>
+
+            <section class="filter-section">
+                <input type="text" id="inputSearch" class="search-box" placeholder="Buscar por número de ticket o institución..." oninput="filtrarTickets()">
+                
+                <div class="tabs-container">
+                    <button class="tab-btn active" data-filter="todo" onclick="cambiarFiltroTab(this)">Todo</button>
+                    <button class="tab-btn" data-filter="abierto" onclick="cambiarFiltroTab(this)">Abiertos</button>
+                    <button class="tab-btn" data-filter="cerrado" onclick="cambiarFiltroTab(this)">Cerrados</button>
+                </div>
+            </section>
+
+            <section class="tickets-list" id="contenedorTickets"></section>
+        </div>
+    </section>
+
+    <div class="modal-overlay" id="modalTicket">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="md-ticket-id">Detalles del Ticket</h3>
+                <button style="background:none; border:none; font-size:24px; cursor:pointer;" onclick="cerrarModal()">&times;</button>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Institución Educativa</p>
+                <p id="md-ticket-inst" style="font-weight: 600; font-size: 16px; margin-bottom: 12px;"></p>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Descripción del requerimiento</p>
+                <p id="md-ticket-desc" style="font-size: 14px; line-height: 1.4;"></p>
+            </div>
+
+            <div id="area-cierre-formulario">
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Nota de resolución de cierre</label>
+                <textarea id="txtNotaResolucion" class="form-textarea" placeholder="Escribe los detalles técnicos de la solución aplicada..."></textarea>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 16px;" onclick="confirmarCierreTicket()">Registrar Cierre de Servicio</button>
+            </div>
+            
+            <div id="area-cierre-lectura" style="display: none; padding: 12px; background: var(--bg-main); border-radius: 8px; font-size: 14px;">
+                <strong>Ticket Cerrado Histórico.</strong> Los técnicos no pueden modificar ni reabrir este registro.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Base de datos simulada (Historial de tickets abiertos y cerrados)
+        let datasetTickets = [
+            { id: "33251079", inst: "I.E. RAMON MUNERA LOPERA", desc: "Configurar 21 equipos portátiles nuevos.", estado: "abierto" },
+            { id: "33251915", inst: "C.E. BOQUERON VEREDA BOQUERON", desc: "Formatear 10 equipos en la IE.", estado: "abierto" },
+            { id: "33240112", inst: "I.E. FE Y ALEGRIA GRANIZAL", desc: "Mantenimiento preventivo de conectores de red de la sala 2.", estado: "cerrado" },
+            { id: "33252049", inst: "S.E. REFUGIO DEL NIÑO", desc: "Instalar y configurar equipos nuevos.", estado: "abierto" },
+            { id: "33239854", inst: "I.E. LA ESPERANZA", desc: "Revisión de fallo de arranque en servidor de datos principal.", estado: "cerrado" }
+        ];
+
+        let rolActivo = null;
+        let filtroTabActivo = "todo";
+        let ticketSeleccionadoId = null;
+
+        function iniciarSesion(rol) {
+            rolActivo = rol;
+            document.body.setAttribute('data-role', rol);
+            document.getElementById('txt-rol-activo').innerText = rol === 'admin' ? 'Administrador del Sistema' : 'Técnico de Soporte';
+            
+            document.getElementById('view-login').classList.remove('active');
+            document.getElementById('view-dashboard').classList.add('active');
+            
+            renderizarTickets();
+        }
+
+        function cerrarSesion() {
+            rolActivo = null;
+            document.body.removeAttribute('data-role');
+            document.getElementById('view-dashboard').classList.remove('active');
+            document.getElementById('view-login').classList.add('active');
+        }
+
+        function renderizarTickets() {
+            const contenedor = document.getElementById('contenedorTickets');
+            contenedor.innerHTML = '';
+            
+            const textoBusqueda = document.getElementById('inputSearch').value.toLowerCase();
+
+            // Filtrado lógico combinado (Tab + Buscador de texto)
+            const listaFiltrada = datasetTickets.filter(t => {
+                const cumpleTab = (filtroTabActivo === 'todo') || (t.estado === filtroTabActivo);
+                const cumpleBusqueda = t.id.includes(textoBusqueda) || t.inst.toLowerCase().includes(textoBusqueda);
+                return cumpleTab && cumpleBusqueda;
+            });
+
+            if(listaFiltrada.length === 0) {
+                contenedor.innerHTML = `<p style="text-align:center; color:var(--text-secondary); padding:24px; font-size:14px;">No se encontraron registros en el historial.</p>`;
+                return;
+            }
+
+            listaFiltrada.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = 'ticket-card';
+                card.innerHTML = `
+                    <div class="ticket-top">
+                        <span class="ticket-id">#${ticket.id}</span>
+                        <span class="status-badge ${ticket.estado}">${ticket.estado.toUpperCase()}</span>
+                    </div>
+                    <div class="ticket-inst">${ticket.inst}</div>
+                    <div class="ticket-desc">${ticket.desc}</div>
+                    <button class="btn btn-outline" onclick="consultarTicket('${ticket.id}')">Consultar Detalles</button>
+                `;
+                contenedor.appendChild(card);
+            });
+        }
+
+        function cambiarFiltroTab(elemento) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            elemento.classList.add('active');
+            filtroTabActivo = elemento.getAttribute('data-filter');
+            renderizarTickets();
+        }
+
+        function filtrarTickets() {
+            renderizarTickets();
+        }
+
+        function consultarTicket(id) {
+            const ticket = datasetTickets.find(t => t.id === id);
+            if(!ticket) return;
+
+            ticketSeleccionadoId = id;
+            document.getElementById('md-ticket-id').innerText = `Ticket #${ticket.id}`;
+            document.getElementById('md-ticket-inst').innerText = ticket.inst;
+            document.getElementById('md-ticket-desc').innerText = ticket.desc;
+            document.getElementById('txtNotaResolucion').value = '';
+
+            const areaFormulario = document.getElementById('area-cierre-formulario');
+            const areaLectura = document.getElementById('area-cierre-lectura');
+
+            // Control estricto de permisos en la UI
+            if (ticket.estado === 'cerrado') {
+                areaFormulario.style.display = 'none';
+                areaLectura.style.display = 'block';
+            } else {
+                areaFormulario.style.display = 'block';
+                areaLectura.style.display = 'none';
+            }
+
+            document.getElementById('modalTicket').classList.add('active');
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalTicket').classList.remove('active');
+            ticketSeleccionadoId = null;
+        }
+
+        function confirmarCierreTicket() {
+            if(!ticketSeleccionadoId) return;
+
+            // Modificación local del estado (Simulación de la transacción de Supabase)
+            const índice = datasetTickets.findIndex(t => t.id === ticketSeleccionadoId);
+            if(índice !== -1) {
+                datasetTickets[índice].estado = 'cerrado';
+            }
+
+            cerrarModal();
+            renderizarTickets();
+        }
+    </script>
+</body>
+</html>
